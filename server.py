@@ -20,27 +20,46 @@ class Match:
         return {"winner" : self.winner,
                 "player1" : {"name" : self.playerName1, "matchdata" : self.player1MatchData},
                 "player2" : {"name" : self.playerName2, "matchdata" : self.player2MatchData}}
-        
 
 
-class Matches(Resource):
+class MatchId(Resource):
     def get(self, match_id):
-        return matches[match_id]
+        return matches[match_id]        
 
     def post(self, match_id):
+        return 201
+
+class Matches(Resource):
+    def get(self):
+        return matches
+
+    def post(self):
         match_data = request.json
-        matches[match_id]["match"] = Match(match_data["match"]).toJson()
-        matches[match_id]["device_id"] = match_data["device_id"]
-        return match_data, 201
+        device_id = match_data["device_id"]
+        print(device_id)
+
+        for match_id in range(len(matches)):
+            #add the new device
+            if matches[match_id]["device_id"] == None:
+                matches[match_id]["device_id"] = match_data["device_id"]
+                matches[match_id]["match"] = Match(match_data["match"]).toJson()
+                return match_data, 201
+            #update the existing match information
+            elif matches[match_id]["device_id"] == device_id:
+                matches[match_id]["match"] = Match(match_data["match"]).toJson()
+                return match_data, 201
+            else: 
+                return match_data, 404
 
 
 if __name__ == "__main__":
     app = Flask(__name__)
     api = Api(app)
 
-    matches = [{"device_id" : 0, "match" : None}, 
-            {"device_id" : 1, "match" : None}, 
-            {"device_id" : 2, "match" : None}]
+    matches = [{"device_id" : None, "match" : None}, 
+               {"device_id" : None, "match" : None}, 
+               {"device_id" : None, "match" : None}]
 
-    api.add_resource(Matches, "/matches/<int:match_id>")
+    api.add_resource(MatchId, "/matches/<int:match_id>")
+    api.add_resource(Matches, "/matches")
     app.run(host="0.0.0.0", debug=True)
