@@ -34,31 +34,45 @@ class Matches(Resource):
         return matches
 
     def post(self):
-        match_data = request.json
-        device_id = match_data["device_id"]
+        post_data = request.json
+        device_id = post_data["device_id"]
         print(device_id)
 
-        for match_id in range(len(matches)):
-            #add the new device
-            if matches[match_id]["device_id"] == None:
-                matches[match_id]["device_id"] = match_data["device_id"]
-                matches[match_id]["match"] = Match(match_data["match"]).toJson()
-                return match_data, 201
-            #update the existing match information
-            elif matches[match_id]["device_id"] == device_id:
-                matches[match_id]["match"] = Match(match_data["match"]).toJson()
-                return match_data, 201
-            else: 
-                return match_data, 404
+        updated = False
+        for match_info in matches:
+            if device_id == match_info["device_id"]:
+                match_info["match"] = Match(post_data["match"]).toJson()
+                updated = True
+                return post_data, 201
+        
+        if not updated:
+            matches.append({"device_id" : post_data["device_id"], "match" : Match(post_data["match"]).toJson()})
+            return post_data, 201
+
+        return post_data, 404
+
+            ##add the new device
+            #if matches[match_id]["device_id"] == None:
+            #    matches[match_id]["device_id"] = match_data["device_id"]
+            #    matches[match_id]["match"] = Match(match_data["match"]).toJson()
+            #    return match_data, 201
+            ##update the existing match information
+            #elif matches[match_id]["device_id"] == device_id:
+            #    matches[match_id]["match"] = Match(match_data["match"]).toJson()
+            #    return match_data, 201
+            #else: 
+            #    return match_data, 404
 
 
 if __name__ == "__main__":
     app = Flask(__name__)
     api = Api(app)
 
-    matches = [{"device_id" : None, "match" : None}, 
-               {"device_id" : None, "match" : None}, 
-               {"device_id" : None, "match" : None}]
+    matches = []
+
+    #{"device_id" : None, "match" : None}, 
+    #{"device_id" : None, "match" : None}, 
+    #{"device_id" : None, "match" : None}
 
     api.add_resource(MatchId, "/matches/<int:match_id>")
     api.add_resource(Matches, "/matches")
