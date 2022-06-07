@@ -1,25 +1,44 @@
 from flask import Flask, request
 from flask_restful import Api, Resource, reqparse
+from flask_socketio import SocketIO
+from flask_cors import CORS
 import json
 from json import JSONDecoder
 import sys
 
 
-class Match:
-    def __init__(self, data):
-        self.winner = data["winner"]
-        player1 = data["player1"]
-        player2 = data["player2"]
-        
-        self.playerName1 = player1["name"]
-        self.playerName2 = player2["name"]
-        self.player1MatchData = player1["matchdata"]
-        self.player2MatchData = player2["matchdata"]
+matches = []
+app = Flask(__name__)
+CORS(app)
+app.config['SECRET_KEY'] = 'dartlogSecret!'
+socketio = SocketIO(app, cors_allowed_origins=['http://localhost:3000'])
 
-    def toJson(self):
-        return {"winner" : self.winner,
-                "player1" : {"name" : self.playerName1, "matchdata" : self.player1MatchData},
-                "player2" : {"name" : self.playerName2, "matchdata" : self.player2MatchData}}
+
+def update_matches(match_info_input):
+    device_id = match_info_input["device_id"]
+    updated = False
+    print(match_info_input)
+    for match_info in matches:
+        if device_id == match_info['device_id']:
+            match_info["match"] = match_info_input["match"]
+            updated = True
+            return 201
+
+    if not updated:
+        matches.append(match_info_input)
+        return 201
+
+    return 404
+
+@socketio.on('connect')
+def client_connected():
+    print('client connected')
+
+@socketio.on('matchdata-update-from-android')
+def update_matchdata(match_info):
+    print("client sent matchdata via SocketIO from device " + mach_info["device_id"])
+    update_matches(match_info)
+    socketio.emit('matchdata-update-from-server', matches)
 
 
 class MatchId(Resource):
@@ -34,46 +53,18 @@ class Matches(Resource):
         return matches
 
     def post(self):
-        post_data = request.json
-        device_id = post_data["device_id"]
-        print(device_id)
+        match_info = request.json
+        print("client sent matchdata via POST request from device " + match_info["device_id"])
+        return_code = update_matches(match_info)
+        if return_code == 201:
+            socketio.emit('matchdata-update-from-server', matches)
 
-        updated = False
-        for match_info in matches:
-            if device_id == match_info["device_id"]:
-                match_info["match"] = Match(post_data["match"]).toJson()
-                updated = True
-                return post_data, 201
-        
-        if not updated:
-            matches.append({"device_id" : post_data["device_id"], "match" : Match(post_data["match"]).toJson()})
-            return post_data, 201
-
-        return post_data, 404
-
-            ##add the new device
-            #if matches[match_id]["device_id"] == None:
-            #    matches[match_id]["device_id"] = match_data["device_id"]
-            #    matches[match_id]["match"] = Match(match_data["match"]).toJson()
-            #    return match_data, 201
-            ##update the existing match information
-            #elif matches[match_id]["device_id"] == device_id:
-            #    matches[match_id]["match"] = Match(match_data["match"]).toJson()
-            #    return match_data, 201
-            #else: 
-            #    return match_data, 404
+        return match_info, return_code
 
 
 if __name__ == "__main__":
-    app = Flask(__name__)
     api = Api(app)
-
-    matches = []
-
-    #{"device_id" : None, "match" : None}, 
-    #{"device_id" : None, "match" : None}, 
-    #{"device_id" : None, "match" : None}
-
     api.add_resource(MatchId, "/matches/<int:match_id>")
     api.add_resource(Matches, "/matches")
-    app.run(host="0.0.0.0", debug=True)
+
+    socketio.run(app, debug=True, port="5000", host='0.0.0.0')
